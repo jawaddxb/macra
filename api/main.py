@@ -66,6 +66,7 @@ async def get_simulation_status(sim_id: str):
         "sentiment": sim["sentiment"],
         "topSignals": sim["topSignals"],
         "agentResults": agent_results,
+        "recentResponses": sim.get("recentResponses", []),
     }
 
 

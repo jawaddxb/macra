@@ -1,5 +1,5 @@
-# LLM: Uses Claude Haiku via Anthropic API.
-# Set ANTHROPIC_API_KEY env var. Falls back to mock if not set.
+# LLM: Uses OpenRouter (gpt-4o-mini by default).
+# Set OPENROUTER_API_KEY env var. Falls back to mock if not set.
 import asyncio
 import hashlib
 import json
@@ -11,10 +11,10 @@ import uuid
 from typing import Any
 
 try:
-    import anthropic
-    HAS_ANTHROPIC = True
+    from openai import AsyncOpenAI
+    HAS_OPENAI = True
 except ImportError:
-    HAS_ANTHROPIC = False
+    HAS_OPENAI = False
 
 # In-memory store
 simulations: dict[str, dict] = {}
@@ -148,19 +148,26 @@ def create_agents(persona_mix: dict, swarm_size: int, market_focus: list[str]) -
 
 
 async def run_agent_llm(agent: dict, event: str) -> dict:
-    """Run a single agent using Claude Haiku."""
-    client = anthropic.AsyncAnthropic()
+    """Run a single agent using OpenRouter (gpt-4o-mini)."""
+    client = AsyncOpenAI(
+        base_url="https://openrouter.ai/api/v1",
+        api_key=os.getenv("OPENROUTER_API_KEY"),
+    )
     try:
-        message = await client.messages.create(
-            model="claude-haiku-4-5",
+        response = await client.chat.completions.create(
+            model="openai/gpt-4o-mini",
             max_tokens=256,
-            system=agent["system"],
-            messages=[{
-                "role": "user",
-                "content": PERSONA_USER_TEMPLATE.format(event=event),
-            }],
+            temperature=0.85,
+            messages=[
+                {"role": "system", "content": agent["system"]},
+                {"role": "user", "content": PERSONA_USER_TEMPLATE.format(event=event)},
+            ],
+            extra_headers={
+                "HTTP-Referer": "https://macra.vanarchain.com",
+                "X-Title": "MACRA Behavioral Simulator",
+            },
         )
-        content = message.content[0].text.strip()
+        content = response.choices[0].message.content.strip()
         if "{" in content:
             json_str = content[content.index("{"):content.rindex("}") + 1]
             result = json.loads(json_str)
@@ -341,7 +348,7 @@ async def run_simulation(sim_id: str, event: str, market_focus: list[str], perso
     sim["total"] = len(agents)
     sim["agents"] = agents
 
-    use_llm = HAS_ANTHROPIC and bool(os.getenv("ANTHROPIC_API_KEY"))
+    use_llm = HAS_OPENAI and bool(os.getenv("OPENROUTER_API_KEY"))
 
     batch_size = 5 if use_llm else 10
 

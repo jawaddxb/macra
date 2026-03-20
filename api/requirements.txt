@@ -1,7 +1,6 @@
 fastapi
 uvicorn[standard]
-openai
-anthropic>=0.40.0
+openai>=1.0.0
 pydantic
 python-dotenv
 httpx

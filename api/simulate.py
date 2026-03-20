@@ -9,12 +9,14 @@ import random
 import time
 import uuid
 from typing import Any
+import importlib
 
-try:
-    from openai import AsyncOpenAI
-    HAS_OPENAI = True
-except ImportError:
-    HAS_OPENAI = False
+# Check openai at runtime (not import time) to handle venv path issues
+def _has_openai() -> bool:
+    spec = importlib.util.find_spec("openai")
+    return spec is not None
+
+HAS_OPENAI = _has_openai()
 
 # In-memory store
 simulations: dict[str, dict] = {}
@@ -149,6 +151,7 @@ def create_agents(persona_mix: dict, swarm_size: int, market_focus: list[str]) -
 
 async def run_agent_llm(agent: dict, event: str) -> dict:
     """Run a single agent using OpenRouter (gpt-4o-mini)."""
+    from openai import AsyncOpenAI
     client = AsyncOpenAI(
         base_url="https://openrouter.ai/api/v1",
         api_key=os.getenv("OPENROUTER_API_KEY"),

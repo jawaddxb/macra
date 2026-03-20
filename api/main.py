@@ -125,4 +125,13 @@ async def get_pre_mortem():
 
 @app.get("/api/health")
 async def health():
-    return {"status": "ok", "service": "macra-api"}
+    import os, importlib
+    has_openai = importlib.util.find_spec("openai") is not None
+    key_set = bool(os.getenv("OPENROUTER_API_KEY"))
+    return {
+        "status": "ok",
+        "service": "macra-api",
+        "has_openai": has_openai,
+        "key_set": key_set,
+        "llm_ready": has_openai and key_set,
+    }

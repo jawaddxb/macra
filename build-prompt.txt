@@ -1,0 +1,194 @@
+Build the complete MACRA demo — Live Global Behavioral Demand Simulator.
+
+## PROJECT STRUCTURE
+Create a full monorepo with:
+- /frontend/ — Next.js 14 App Router + Tailwind + Framer Motion
+- /api/ — FastAPI Python backend (simulation engine)
+- README.md — beautiful, with the Pre-Mortem demo scenario
+- docker-compose.yml — to run both together
+
+---
+
+## DESIGN SYSTEM
+- Background: #0a0a0a
+- Accent: #0A7B6E (Vanar teal)
+- Text: white / #e5e5e5
+- Muted: #666666
+- Surface: #111111 / #161616
+- Border: #1f1f1f
+- Font: Inter (Google Fonts)
+- Rounded corners, subtle glass morphism cards
+- Dark, premium, slightly intimidating
+
+---
+
+## FRONTEND: Next.js 14 App Router
+
+### frontend/package.json
+Dependencies: next@14, react, react-dom, typescript, tailwindcss, framer-motion, d3, chart.js, react-chartjs-2, lucide-react, @types/d3
+
+### Pages/Routes:
+1. app/page.tsx — Landing + Seed Input
+2. app/simulate/[id]/page.tsx — Live Cascade Visualization
+3. app/results/[id]/page.tsx — Output Dashboard
+
+### Screen 1: Landing / Seed Input (app/page.tsx)
+Full-screen dark landing with:
+- Top nav: "MACRA" logo (teal) + "Simulate what's next." tagline + "View Demo" button
+- Hero: Big bold headline "Feed it a news event. Watch the world respond." + subtext
+- Main form card (dark, glassy):
+  - Label: "EVENT CATALYST"
+  - Large textarea (placeholder: "e.g. Oil prices spike 40% following OPEC+ production cuts and escalating Middle East tensions")
+  - "MARKET FOCUS" — pill tag selectors: [Global] [MENA] [US] [EU] [APAC]
+  - "PERSONA MIX" — three sliders:
+    - Retail Consumers: 0-100 (default 40)
+    - B2B Buyers: 0-100 (default 35)
+    - Institutional Traders: 0-100 (default 25)
+  - "SWARM SIZE" — three option cards:
+    - FREE: "500 AGENTS" / "Public Results" / "3/day limit"
+    - PRO: "10,000 AGENTS" / "Sealed Results" / "$12 via x402" (with lock icon)
+    - ENTERPRISE: "100,000 AGENTS" / "Custom Personas" / "$120 via x402" (with lock icon)
+  - Big teal "RUN SIMULATION" button
+- Below fold: "THE PRE-MORTEM" demo section — Red Sea crisis callout card
+- Footer: "Built on Vanar Stack" with L2-L8 badges
+
+### Screen 2: Cascade Visualization (app/simulate/[id]/page.tsx)
+Two-panel layout:
+- Left 65%: D3.js force-directed graph
+  - Nodes are agents (tiny circles, 6-8px)
+  - Clustered by persona type (3 clusters, labelled)
+  - Node states: grey (idle) -> yellow (thinking) -> #ef4444 red (bearish) / #22c55e green (bullish)
+  - Edges connect influencing agents (thin lines, #1f1f1f)
+  - Animated: nodes change colour in waves as simulation progresses
+  - On hover: tooltip shows agent persona + decision
+- Right 35%: Live stats panel (dark card)
+  - "SIMULATION RUNNING" status badge with pulsing dot
+  - Progress: "347 / 500 agents complete" with animated progress bar
+  - Live donut chart: Bullish % / Bearish % / Neutral %
+  - "TOP SIGNALS DETECTED" — live updating list of 3-5 behavioral triggers
+  - "ETA: 45 seconds" countdown
+
+Use polling from the API (GET /api/simulation/{id}/status) to update state every 1 second.
+Use useEffect + setInterval pattern.
+After simulation complete, auto-redirect to /results/{id}
+
+### Screen 3: Output Dashboard (app/results/[id]/page.tsx)
+- Top: "SIMULATION COMPLETE" badge + Knowracle attestation badge
+- Hero metric card: Giant number "+22% Shipping Demand" with direction arrow (animated count-up)
+- 2-column layout:
+  - Left: Demand curve chart (Chart.js line chart, 30/60/90 day projection, teal line with confidence band)
+  - Right: Behavioral breakdown (horizontal bar chart showing persona contributions)
+- Full-width: Geographic heatmap (simple SVG world map with colored regions)
+- "THE WHY" card — K-On synthesis narrative text (italic, elegant)
+- Knowracle attestation card:
+  - "SIMULATION CERTIFIED" header
+  - Hash: SHA-256 looking string
+  - Timestamp
+  - "Verified on Vanar Network" with green checkmark
+  - Vanar teal border
+- Action buttons: [Download PDF Report] [Get API Access] [Run a Variant]
+
+### x402 Payment Modal
+A modal component that appears when selecting Pro/Enterprise tier:
+- "UNLOCK PRO SIMULATION" header
+- "Pay 12 USDC via x402 protocol"
+- Wallet address input + "Connect Wallet" button
+- Or "Pay with card" option
+- "Powered by Ferron x402"
+
+---
+
+## BACKEND: FastAPI (api/)
+
+### api/main.py
+Full FastAPI app with CORS enabled:
+
+POST /api/simulate
+- Body: { event: str, marketFocus: list[str], personaMix: dict, swarmSize: int }
+- Creates simulation job, returns { simulationId: str }
+
+GET /api/simulation/{id}/status
+- Returns: { status: "running"|"complete", progress: int, total: int, agentResults: list, sentiment: dict, topSignals: list }
+
+GET /api/simulation/{id}/results
+- Returns full results: { demandChange: float, demandCurve: list, geoData: dict, behavioral: dict, narrative: str, attestation: dict }
+
+GET /api/demo/pre-mortem
+- Returns pre-populated Red Sea scenario results (hardcoded demo data)
+
+### Simulation Engine (api/simulate.py)
+Mock engine that:
+1. Creates N "agent personas" based on persona mix
+2. For each agent (processed in batches of 8 using asyncio):
+   - If OPENAI_API_KEY is set, calls GPT-4o-mini with a persona prompt
+   - Otherwise uses realistic mock data
+   - Each returns: sentiment (-1 to 1), behavioral response text, key factors
+3. K-On aggregation: average sentiments weighted by persona mix -> demand signal
+4. Generate demand curve: 30/60/90 day projections with confidence bands
+5. Generate geo distribution
+6. Generate K-On narrative synthesis
+
+Agent Persona Prompts (when using real LLM):
+- Retail Consumer: "You are a retail consumer in {region}. Based on this news event: {event}. How does this change your purchasing behavior? Respond with JSON: {sentiment: float -1 to 1, response: str, factors: list}"
+- B2B Buyer: "You are a B2B procurement manager. Event: {event}. How does this affect your sourcing decisions? Respond with JSON: {sentiment: float, response: str, factors: list}"
+- Institutional Trader: "You are an institutional trader. Event: {event}. Provide behavioral response with JSON: {sentiment: float, response: str, factors: list}"
+
+Use in-memory dict to store simulation state (simulations = {}).
+Use asyncio background tasks in FastAPI.
+
+Pre-Mortem Demo Data (hardcoded in api/main.py):
+The scenario is the Red Sea Shipping Crisis from Dec 2023.
+demandChange: +22, metric: "Shipping Cost Index"
+Predictions:
+- Shipping costs: predicted +22%, actual +24%, accuracy 91%
+- EU retail demand for imports: predicted -14%, actual -11%, accuracy 79%
+- Nearshoring intent: predicted +8%, actual +9%, accuracy 89%
+Overall accuracy: 86%
+Narrative: "The primary signal was not price sensitivity but supply security fear among B2B buyers in the EU. Institutional traders began pricing in the disruption 72 hours before formal announcements. The cascade was triggered by three interdependent signals: (1) war risk advisory language matching historical patterns, (2) B2B procurement managers switching to air freight quotes, (3) retail consumer sentiment in Germany shifting to domestic-brand preference."
+
+### api/requirements.txt:
+fastapi
+uvicorn
+openai
+pydantic
+python-dotenv
+httpx
+
+---
+
+## README.md
+Create a beautiful README with:
+- Big MACRA header: "Feed it a news event. Watch the world respond."
+- Tagline: "Live Global Behavioral Demand Simulator — powered by Vanar AI Stack"
+- What is MACRA section (2-3 sentences)
+- The Pre-Mortem callout: Red Sea scenario with the accuracy numbers
+- Vanar stack mapping table (L2 Neutron through L8 Knowracle)
+- Quick start instructions (docker-compose up / manual)
+- Pricing table (Free $0 / Starter $50/run / Pro $500/run / Enterprise $5K-25K/month)
+- Built on Vanar Stack section
+
+---
+
+## DOCKER-COMPOSE (docker-compose.yml)
+version 3.8, two services:
+- api: build ./api, port 8000:8000, env OPENAI_API_KEY
+- frontend: build ./frontend, port 3000:3000, env NEXT_PUBLIC_API_URL=http://localhost:8000
+- Add Dockerfiles for both api/ and frontend/
+
+---
+
+## CRITICAL IMPLEMENTATION NOTES:
+1. The D3 force graph MUST be a real React component using useRef + useEffect to mount D3 — no placeholder
+2. All charts must actually render using Chart.js with react-chartjs-2
+3. The simulation polling must actually work — the API must return progress updates every second via background task
+4. Use TypeScript throughout the frontend
+5. Make the landing page genuinely beautiful — this is a product demo for investors
+6. The Knowracle attestation badge shows a SHA-256-format hash (compute client-side from sim params using Web Crypto API or just format a deterministic hex string)
+7. Add smooth page transitions with Framer Motion
+8. The simulation actually needs to complete — after the swarm size timeout, status changes to "complete"
+9. Use next/font for Inter font loading
+10. Add proper loading states and error boundaries
+11. The frontend needs a .env.local.example file with NEXT_PUBLIC_API_URL=http://localhost:8000
+
+When completely finished, run this exact command to notify Jarvis:
+openclaw system event --text "Done: MACRA built — Next.js + FastAPI demo complete" --mode now

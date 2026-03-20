@@ -4,6 +4,6 @@
     "builder": "NIXPACKS"
   },
   "deploy": {
-    "startCommand": "npx next start -p ${PORT:-3000}"
+    "startCommand": "npx next start -p $PORT"
   }
 }

@@ -56,6 +56,7 @@ async def get_simulation_status(sim_id: str):
             "region": agent["region"],
             "status": agent["status"],
             "sentiment": agent["result"]["sentiment"] if agent["result"] else None,
+            "response": agent["result"]["response"] if agent["result"] else None,
         })
 
     return {

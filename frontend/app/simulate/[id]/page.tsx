@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Doughnut } from "react-chartjs-2";
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
-import { Activity, Zap, Signal, Clock } from "lucide-react";
+import { Activity, Zap, Signal, Clock, MessageSquare } from "lucide-react";
 import ForceGraph from "@/components/ForceGraph";
 import { getSimulationStatus, type SimulationStatus } from "@/lib/api";
 
@@ -273,6 +273,86 @@ export default function SimulatePage() {
                     Analyzing behavioral patterns...
                   </div>
                 )}
+              </div>
+            </motion.div>
+
+            {/* Agent Reasoning Feed */}
+            <motion.div
+              className="glass rounded-xl p-5"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.3 }}
+            >
+              <div className="flex items-center gap-2 mb-4">
+                <MessageSquare size={14} className="text-accent" />
+                <span className="text-xs font-semibold text-muted tracking-widest uppercase">
+                  Agent Reasoning Feed
+                </span>
+              </div>
+              <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
+                {(() => {
+                  const completedAgents = (status?.agentResults || [])
+                    .filter((a) => a.response && a.status !== "idle" && a.status !== "thinking")
+                    .slice(-8)
+                    .reverse();
+                  if (completedAgents.length === 0) {
+                    return (
+                      <div className="text-xs text-muted text-center py-4">
+                        Waiting for agent responses...
+                      </div>
+                    );
+                  }
+                  return completedAgents.map((agent) => (
+                    <div
+                      key={agent.id}
+                      className="bg-bg rounded-lg p-3 border border-border"
+                    >
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span
+                          className={`text-[10px] font-bold tracking-wider uppercase px-1.5 py-0.5 rounded ${
+                            agent.type === "retail"
+                              ? "bg-blue-500/15 text-blue-400"
+                              : agent.type === "b2b"
+                                ? "bg-purple-500/15 text-purple-400"
+                                : "bg-amber-500/15 text-amber-400"
+                          }`}
+                        >
+                          {agent.type}
+                        </span>
+                        <span className="text-[10px] text-muted">
+                          {agent.region}
+                        </span>
+                      </div>
+                      <p className="text-xs text-text-secondary leading-relaxed">
+                        &quot;{agent.response}&quot;
+                      </p>
+                      <div className="mt-1.5 flex items-center gap-1">
+                        <div
+                          className={`w-1.5 h-1.5 rounded-full ${
+                            agent.status === "bullish"
+                              ? "bg-green-400"
+                              : agent.status === "bearish"
+                                ? "bg-red-400"
+                                : "bg-gray-500"
+                          }`}
+                        />
+                        <span
+                          className={`text-[10px] font-medium ${
+                            agent.status === "bullish"
+                              ? "text-green-400"
+                              : agent.status === "bearish"
+                                ? "text-red-400"
+                                : "text-gray-500"
+                          }`}
+                        >
+                          {agent.sentiment !== null
+                            ? `${agent.sentiment > 0 ? "+" : ""}${(agent.sentiment * 100).toFixed(0)}%`
+                            : "—"}
+                        </span>
+                      </div>
+                    </div>
+                  ));
+                })()}
               </div>
             </motion.div>
           </div>

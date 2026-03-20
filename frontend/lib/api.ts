@@ -13,6 +13,7 @@ export interface AgentResult {
   region: string;
   status: "idle" | "thinking" | "bullish" | "bearish" | "neutral";
   sentiment: number | null;
+  response: string | null;
 }
 
 export interface SimulationStatus {

@@ -52,13 +52,13 @@ const TIERS = [
 ];
 
 const STACK_LAYERS = [
-  { id: "L2", name: "Neutron", desc: "Settlement Layer" },
-  { id: "L3", name: "Virtron", desc: "Data Processing" },
-  { id: "L4", name: "Ferron", desc: "Payment Rails" },
-  { id: "L5", name: "Arkon", desc: "Compute Engine" },
-  { id: "L6", name: "K-On", desc: "AI Agent Swarm" },
-  { id: "L7", name: "Lumion", desc: "Visualization" },
-  { id: "L8", name: "Knowracle", desc: "Attestation" },
+  { id: "L2", name: "Neutron", desc: "Memory Layer" },
+  { id: "L3", name: "K-On", desc: "Query & Inference" },
+  { id: "L4", name: "Flows", desc: "Workflow Orchestration" },
+  { id: "L5", name: "Axon", desc: "Smart Contract Deploy" },
+  { id: "L6", name: "Ferron", desc: "Execution & Payments" },
+  { id: "L7", name: "Veil", desc: "Encryption Layer" },
+  { id: "L8", name: "Knowracle", desc: "Trust & Governance" },
 ];
 
 export default function HomePage() {

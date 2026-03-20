@@ -25,6 +25,8 @@ import {
   CheckCircle2,
   ExternalLink,
   Sparkles,
+  Copy,
+  Check,
 } from "lucide-react";
 import WorldMap from "@/components/WorldMap";
 import { getSimulationResults, type SimulationResults } from "@/lib/api";
@@ -73,6 +75,7 @@ export default function ResultsPage() {
   const id = params.id as string;
   const [results, setResults] = useState<SimulationResults | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [hashCopied, setHashCopied] = useState(false);
 
   useEffect(() => {
     async function fetchResults() {
@@ -371,9 +374,22 @@ export default function ResultsPage() {
               The Why — K-On Synthesis
             </h3>
           </div>
-          <p className="text-text-secondary leading-relaxed italic text-sm">
-            &quot;{results.narrative}&quot;
-          </p>
+          <div className="space-y-3">
+            {results.narrative.split(". ").reduce((acc: string[][], sentence, i, arr) => {
+              // Group sentences into paragraphs of 2-3
+              const lastGroup = acc[acc.length - 1];
+              if (lastGroup && lastGroup.length < 2) {
+                lastGroup.push(sentence + (i < arr.length - 1 ? "." : ""));
+              } else {
+                acc.push([sentence + (i < arr.length - 1 ? "." : "")]);
+              }
+              return acc;
+            }, []).map((group, i) => (
+              <p key={i} className="text-text-secondary leading-relaxed text-sm">
+                {group.join(" ")}
+              </p>
+            ))}
+          </div>
         </motion.div>
 
         {/* Knowracle Attestation */}
@@ -398,9 +414,26 @@ export default function ResultsPage() {
           <div className="space-y-2 text-sm">
             <div className="flex items-start gap-3">
               <span className="text-muted w-20 flex-shrink-0">Hash</span>
-              <span className="font-mono text-text-secondary text-xs break-all">
-                {results.attestation.hash}
-              </span>
+              <div className="flex items-start gap-2 flex-1 min-w-0">
+                <span className="font-mono text-text-secondary text-xs break-all">
+                  {results.attestation.hash}
+                </span>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(results.attestation.hash);
+                    setHashCopied(true);
+                    setTimeout(() => setHashCopied(false), 2000);
+                  }}
+                  className="flex-shrink-0 p-1 rounded hover:bg-white/10 transition-colors cursor-pointer"
+                  title="Copy hash"
+                >
+                  {hashCopied ? (
+                    <Check size={14} className="text-green-400" />
+                  ) : (
+                    <Copy size={14} className="text-muted hover:text-white" />
+                  )}
+                </button>
+              </div>
             </div>
             <div className="flex items-center gap-3">
               <span className="text-muted w-20 flex-shrink-0">Time</span>

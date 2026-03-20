@@ -1,3 +1,5 @@
+# LLM: Uses Claude Haiku via Anthropic API. Set ANTHROPIC_API_KEY env var. Falls back to mock if not set.
+
 import asyncio
 import hashlib
 import json
@@ -8,60 +10,97 @@ import time
 import uuid
 from typing import Any
 
-# Try to import openai
+# Try to import anthropic
 try:
-    from openai import AsyncOpenAI
-    HAS_OPENAI = True
+    import anthropic
+    HAS_ANTHROPIC = True
 except ImportError:
-    HAS_OPENAI = False
+    HAS_ANTHROPIC = False
 
 
 # In-memory store for simulations
 simulations: dict[str, dict] = {}
 
 
-PERSONA_PROMPTS = {
+PERSONA_SYSTEM_PROMPTS = {
     "retail": (
-        "You are a retail consumer in {region}. Based on this news event: {event}. "
-        "How does this change your purchasing behavior? Respond ONLY with JSON: "
-        '{{"sentiment": <float -1 to 1>, "response": "<short text>", "factors": ["<factor1>", "<factor2>"]}}'
+        "You are a retail consumer living in {region}. You are price-conscious with moderate brand loyalty. "
+        "Your risk tolerance is low — you prefer stability and predictability in your purchases. "
+        "You follow mainstream news but don't actively track commodity markets or trade policy. "
+        "You make purchasing decisions based on what you see at the store, hear from friends, and read on social media. "
+        "Your household income is average for your region. Respond with realistic, human language about how "
+        "you'd actually change your buying behavior."
     ),
     "b2b": (
-        "You are a B2B procurement manager in {region}. Event: {event}. "
-        "How does this affect your sourcing decisions? Respond ONLY with JSON: "
-        '{{"sentiment": <float -1 to 1>, "response": "<short text>", "factors": ["<factor1>", "<factor2>"]}}'
+        "You are a B2B procurement manager operating in {region}. You manage a mid-to-large supply chain "
+        "with 20-50 active suppliers across multiple categories. Your risk tolerance is moderate — you balance "
+        "cost optimization with supply security. You monitor trade publications, freight indices, and have "
+        "early visibility into shipping disruptions through your logistics partners. Your decisions affect "
+        "millions in quarterly spend. You think in terms of lead times, buffer stock, and supplier diversification."
     ),
     "institutional": (
-        "You are an institutional trader focused on {region} markets. Event: {event}. "
-        "Provide behavioral response. Respond ONLY with JSON: "
-        '{{"sentiment": <float -1 to 1>, "response": "<short text>", "factors": ["<factor1>", "<factor2>"]}}'
+        "You are an institutional trader at a hedge fund focused on {region} markets. You manage a $500M+ "
+        "portfolio across equities, commodities, and derivatives. You have high risk tolerance but are "
+        "data-driven. You react to macro events within hours and look for alpha in structural shifts. "
+        "You think in terms of positioning, correlation, tail risk, and information asymmetry. "
+        "You have access to proprietary data feeds and satellite imagery for supply chain analysis."
     ),
 }
 
 MOCK_RESPONSES = {
     "retail": [
-        {"sentiment": -0.6, "response": "Switching to domestic brands to avoid supply disruptions", "factors": ["supply fear", "brand loyalty shift"]},
-        {"sentiment": -0.3, "response": "Stockpiling essentials due to anticipated price increases", "factors": ["price sensitivity", "hoarding behavior"]},
-        {"sentiment": 0.2, "response": "Minimal impact on my daily purchasing decisions", "factors": ["low awareness", "price insensitivity"]},
-        {"sentiment": -0.8, "response": "Cutting discretionary spending significantly", "factors": ["inflation fear", "budget constraints"]},
-        {"sentiment": 0.4, "response": "Opportunistically buying local alternatives", "factors": ["domestic preference", "quality perception"]},
-        {"sentiment": -0.5, "response": "Delaying major purchases until market stabilizes", "factors": ["uncertainty aversion", "wait-and-see"]},
+        {"sentiment": -0.6, "response": "Switching to domestic brands — I don't trust imports to show up on time anymore", "factors": ["supply fear", "brand loyalty shift"]},
+        {"sentiment": -0.3, "response": "Bought extra rice and cooking oil this weekend, just in case prices jump", "factors": ["price sensitivity", "hoarding behavior"]},
+        {"sentiment": 0.2, "response": "Honestly haven't noticed much difference at the grocery store yet", "factors": ["low awareness", "price insensitivity"]},
+        {"sentiment": -0.8, "response": "Cancelled our vacation plans. Can't justify discretionary spending right now", "factors": ["inflation fear", "budget constraints"]},
+        {"sentiment": 0.4, "response": "Actually found some great local alternatives I should've been buying all along", "factors": ["domestic preference", "quality discovery"]},
+        {"sentiment": -0.5, "response": "Holding off on the new car. Gonna wait at least 6 months to see where things land", "factors": ["uncertainty aversion", "wait-and-see"]},
+        {"sentiment": -0.7, "response": "My electric bill is killing me. Cut streaming subscriptions to compensate", "factors": ["energy costs", "discretionary cuts"]},
+        {"sentiment": 0.1, "response": "Prices went up a bit but my salary adjustment covers it. Not worried yet", "factors": ["wage adjustment", "low concern"]},
+        {"sentiment": -0.4, "response": "Started buying in bulk at Costco instead of weekly shops. Every dollar counts", "factors": ["bulk buying shift", "cost optimization"]},
+        {"sentiment": -0.9, "response": "Three of us at work got laid off. I'm cutting everything non-essential immediately", "factors": ["job insecurity", "survival mode"]},
+        {"sentiment": 0.3, "response": "My neighbor said to panic but I think this blows over in a month", "factors": ["optimism bias", "social influence"]},
+        {"sentiment": -0.2, "response": "Switched from name brands to store brands on about half my groceries", "factors": ["downtrading", "price comparison"]},
+        {"sentiment": -0.6, "response": "Postponing home renovation. Materials are already 20% more than the quote from January", "factors": ["construction costs", "project deferral"]},
+        {"sentiment": 0.5, "response": "I work in renewables — this is actually good for our sector long term", "factors": ["sector beneficiary", "career optimism"]},
+        {"sentiment": -0.35, "response": "Using the car less, working from home more. Gas prices are ridiculous", "factors": ["fuel costs", "behavior change"]},
+        {"sentiment": -0.45, "response": "My online shopping cart has been sitting at checkout for a week. Can't pull the trigger", "factors": ["purchase hesitation", "decision paralysis"]},
     ],
     "b2b": [
-        {"sentiment": -0.7, "response": "Activating backup suppliers and nearshore alternatives", "factors": ["supply chain risk", "nearshoring"]},
-        {"sentiment": -0.4, "response": "Increasing inventory buffers by 30%", "factors": ["buffer stock strategy", "lead time concerns"]},
-        {"sentiment": 0.3, "response": "Negotiating long-term contracts at current prices", "factors": ["price lock strategy", "forward planning"]},
-        {"sentiment": -0.9, "response": "Emergency procurement review across all categories", "factors": ["risk mitigation", "cost escalation"]},
-        {"sentiment": 0.1, "response": "Monitoring situation but no immediate changes", "factors": ["low exposure", "diversified supply"]},
-        {"sentiment": -0.6, "response": "Requesting air freight quotes as maritime backup", "factors": ["logistics shift", "cost acceptance"]},
+        {"sentiment": -0.7, "response": "Activated two backup suppliers in Mexico and Poland. Can't depend on single-source anymore", "factors": ["supply chain risk", "nearshoring"]},
+        {"sentiment": -0.4, "response": "Increased safety stock from 30 to 45 days across all A-category SKUs", "factors": ["buffer stock strategy", "lead time concerns"]},
+        {"sentiment": 0.3, "response": "Locked in 18-month contracts at current prices. If costs spike, we're hedged", "factors": ["price lock strategy", "forward planning"]},
+        {"sentiment": -0.9, "response": "Emergency procurement review. CFO wants full exposure audit by Friday", "factors": ["risk mitigation", "cost escalation"]},
+        {"sentiment": 0.1, "response": "We're diversified enough. Monitoring daily but no panic moves", "factors": ["low exposure", "diversified supply"]},
+        {"sentiment": -0.6, "response": "Switched three product lines to air freight. Eating the cost to keep SLAs intact", "factors": ["logistics shift", "service level priority"]},
+        {"sentiment": -0.55, "response": "Renegotiating terms with our top 10 suppliers. Force majeure clauses everywhere", "factors": ["contract renegotiation", "legal protection"]},
+        {"sentiment": -0.8, "response": "Our Shenzhen supplier just quoted 35% higher. Sourcing alternatives in Vietnam immediately", "factors": ["supplier price shock", "geographic diversification"]},
+        {"sentiment": 0.4, "response": "This is the push we needed to onshore manufacturing. Board approved the capex", "factors": ["reshoring catalyst", "strategic investment"]},
+        {"sentiment": -0.3, "response": "Extending payment terms to 90 days to preserve cash flow during the transition", "factors": ["cash flow management", "payment terms"]},
+        {"sentiment": -0.65, "response": "Halted all new vendor onboarding. Focusing on securing existing supply lines first", "factors": ["vendor freeze", "consolidation"]},
+        {"sentiment": 0.2, "response": "Our competitors are panicking. We built redundancy two years ago — this is our advantage", "factors": ["competitive advantage", "preparedness"]},
+        {"sentiment": -0.5, "response": "Warehouse utilization at 94%. Scrambling for overflow storage to buffer inventory", "factors": ["warehousing pressure", "capacity crunch"]},
+        {"sentiment": -0.75, "response": "Insurance premiums on our shipments just doubled. Passing costs downstream is inevitable", "factors": ["insurance costs", "cost pass-through"]},
+        {"sentiment": 0.15, "response": "Regional sourcing actually came in cheaper than expected. Silver lining in the chaos", "factors": ["regional efficiency", "cost surprise"]},
+        {"sentiment": -0.45, "response": "Put Q3 product launches on hold. Can't guarantee component availability", "factors": ["product delay", "component shortage"]},
     ],
     "institutional": [
-        {"sentiment": -0.5, "response": "Increasing short positions on affected shipping indices", "factors": ["market timing", "volatility play"]},
-        {"sentiment": 0.6, "response": "Going long on domestic manufacturing ETFs", "factors": ["reshoring thesis", "sector rotation"]},
-        {"sentiment": -0.3, "response": "Hedging energy exposure with options", "factors": ["risk management", "energy correlation"]},
-        {"sentiment": 0.8, "response": "Positioning for nearshoring beneficiaries", "factors": ["structural shift", "long-term trend"]},
-        {"sentiment": -0.7, "response": "Reducing exposure to trade-sensitive sectors", "factors": ["de-risking", "geopolitical premium"]},
-        {"sentiment": 0.2, "response": "Adding defensive positions while monitoring", "factors": ["cautious optimism", "hedged exposure"]},
+        {"sentiment": -0.5, "response": "Increasing short positions on BDI and container shipping indices. Volatility is mispriced", "factors": ["market timing", "volatility play"]},
+        {"sentiment": 0.6, "response": "Going long domestic manufacturing ETFs. Reshoring thesis is accelerating faster than consensus", "factors": ["reshoring thesis", "sector rotation"]},
+        {"sentiment": -0.3, "response": "Bought 3-month put spreads on energy. Hedging the tail risk at cheap implied vol", "factors": ["risk management", "energy correlation"]},
+        {"sentiment": 0.8, "response": "Mexico and India infrastructure plays are screaming buy. Nearshoring beneficiaries are obvious", "factors": ["structural shift", "emerging market alpha"]},
+        {"sentiment": -0.7, "response": "Reducing gross exposure by 15%. This isn't a dip to buy — it's a regime change", "factors": ["de-risking", "regime shift"]},
+        {"sentiment": 0.2, "response": "Added small defensive positions in utilities and staples. No conviction for directional bets yet", "factors": ["cautious optimism", "hedged exposure"]},
+        {"sentiment": -0.85, "response": "Unwinding all EM carry trades. Correlation spike means diversification is illusory right now", "factors": ["correlation risk", "carry unwind"]},
+        {"sentiment": 0.7, "response": "Commodities super-cycle thesis intact. Adding to copper and lithium longs on the pullback", "factors": ["super-cycle thesis", "commodity rebalancing"]},
+        {"sentiment": -0.4, "response": "Satellite data shows port congestion building. Positioning short retail ahead of earnings miss", "factors": ["alternative data", "earnings positioning"]},
+        {"sentiment": 0.5, "response": "Defense and cybersecurity names breaking out. Geopolitical premium is under-owned", "factors": ["defense allocation", "geopolitical hedge"]},
+        {"sentiment": -0.6, "response": "Our quant models flagged this pattern — matches 2018 trade war dynamics. Risk-off across the book", "factors": ["pattern matching", "systematic risk-off"]},
+        {"sentiment": 0.35, "response": "Buying vol in FX crosses. Event-driven dispersion is historically cheap here", "factors": ["volatility buying", "FX positioning"]},
+        {"sentiment": -0.25, "response": "No strong conviction. Raised cash to 20% and waiting for clarity on policy response", "factors": ["cash positioning", "policy uncertainty"]},
+        {"sentiment": 0.45, "response": "Agricultural futures showing dislocation. Going long wheat and soybean on supply disruption", "factors": ["agricultural play", "supply dislocation"]},
+        {"sentiment": -0.55, "response": "Credit spreads widening in transport names. CDS on major shipping lines looking attractive", "factors": ["credit positioning", "shipping stress"]},
+        {"sentiment": 0.15, "response": "Maintaining market-neutral stance but rotating factor exposures toward value and away from momentum", "factors": ["factor rotation", "style shift"]},
     ],
 }
 
@@ -98,20 +137,29 @@ def create_agents(persona_mix: dict, swarm_size: int, market_focus: list[str]) -
     return agents
 
 
-async def run_agent_llm(agent: dict, event: str, client: "AsyncOpenAI") -> dict:
-    """Run a single agent using LLM."""
-    prompt = PERSONA_PROMPTS.get(agent["type"], PERSONA_PROMPTS["retail"])
-    prompt = prompt.format(region=agent["region"], event=event)
+async def run_agent_llm(agent: dict, event: str, client: "anthropic.AsyncAnthropic") -> dict:
+    """Run a single agent using Anthropic Claude Haiku."""
+    persona_type = agent["type"]
+    region = agent["region"]
+
+    system = PERSONA_SYSTEM_PROMPTS.get(persona_type, PERSONA_SYSTEM_PROMPTS["retail"])
+    system = system.format(region=region)
+
+    user_msg = (
+        f"Event: {event}\n"
+        f"Region: {region}\n"
+        f"Your response as {persona_type}:\n\n"
+        f'Respond ONLY with JSON: {{"sentiment": <float -1 to 1>, "response": "<short text>", "factors": ["<factor1>", "<factor2>"]}}'
+    )
 
     try:
-        response = await client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.8,
+        response = await client.messages.create(
+            model="claude-haiku-4-5",
             max_tokens=200,
+            system=system,
+            messages=[{"role": "user", "content": user_msg}],
         )
-        content = response.choices[0].message.content.strip()
-        # Try to parse JSON from the response
+        content = response.content[0].text.strip()
         if "{" in content:
             json_str = content[content.index("{"):content.rindex("}") + 1]
             result = json.loads(json_str)
@@ -243,28 +291,107 @@ def generate_geo_data(market_focus: list[str], demand_change: float) -> dict:
     return regions
 
 
-def generate_narrative(event: str, demand_change: float, top_signals: list[dict]) -> str:
-    """Generate K-On synthesis narrative."""
+def generate_narrative(event: str, demand_change: float, top_signals: list[dict], behavioral: dict) -> str:
+    """Generate K-On synthesis narrative — Bloomberg Intelligence style."""
     direction = "increase" if demand_change > 0 else "decrease"
+    if abs(demand_change) > 20:
+        severity = "sharp"
+    elif abs(demand_change) > 10:
+        severity = "moderate"
+    elif abs(demand_change) > 5:
+        severity = "mild"
+    else:
+        severity = "marginal"
     abs_change = abs(demand_change)
 
-    signal_text = ", ".join([f"({i+1}) {s['signal']}" for i, s in enumerate(top_signals[:3])])
+    # Identify dominant persona driver
+    persona_labels = {"retail": "Retail Consumers", "b2b": "B2B Procurement", "institutional": "Institutional Traders"}
+    dominant = max(behavioral.items(), key=lambda x: abs(x[1]))
+    dominant_name = persona_labels.get(dominant[0], dominant[0])
+    dominant_val = dominant[1]
 
-    narratives = [
-        f"The simulation reveals a projected {abs_change}% {direction} in demand, driven primarily by behavioral cascades across the agent population. "
-        f"The primary signals detected were: {signal_text}. "
-        f"B2B procurement managers showed the earliest response pattern, adjusting sourcing strategies within the first simulation wave. "
-        f"Institutional traders began pricing in disruption signals before retail consumers registered awareness. "
-        f"The cascade was non-linear — initial sentiment was moderate, but amplified through inter-agent influence as information propagated through the network.",
+    # Build signal references
+    if top_signals:
+        primary_signal = top_signals[0]["signal"]
+        primary_strength = top_signals[0]["strength"]
+        secondary_signals = [s["signal"] for s in top_signals[1:3]]
+    else:
+        primary_signal = "general uncertainty"
+        primary_strength = 0
+        secondary_signals = []
 
-        f"Analysis indicates a {abs_change}% demand {direction} with high confidence. "
-        f"Key behavioral triggers identified: {signal_text}. "
-        f"The agent swarm exhibited classic cascade dynamics — early institutional signals were amplified by B2B risk-aversion behavior, "
-        f"which in turn shifted retail consumer sentiment. The geographic distribution shows concentration in primary market regions "
-        f"with spillover effects reaching secondary markets within the 30-day projection window.",
-    ]
+    retail_pct = behavioral.get("retail", 0)
+    b2b_pct = behavioral.get("b2b", 0)
+    inst_pct = behavioral.get("institutional", 0)
 
-    return random.choice(narratives)
+    parts = []
+
+    # Opening — headline finding
+    parts.append(
+        f"K-On Synthesis projects a {severity} {abs_change}% {direction} in the Behavioral Demand Index "
+        f"over a 90-day horizon."
+    )
+
+    # Primary driver
+    parts.append(
+        f'The primary behavioral catalyst was "{primary_signal}" '
+        f"(detected in {primary_strength}% of agent responses), "
+        f"with {dominant_name} leading the shift at {abs(dominant_val)}% sentiment intensity."
+    )
+
+    # Secondary signals
+    if len(secondary_signals) >= 2:
+        parts.append(
+            f'Reinforcing signals included "{secondary_signals[0]}" and "{secondary_signals[1]}", '
+            f"creating a multi-vector demand cascade."
+        )
+    elif len(secondary_signals) == 1:
+        parts.append(
+            f'A reinforcing signal — "{secondary_signals[0]}" — amplified the primary catalyst.'
+        )
+
+    # Persona breakdown — context-aware
+    if abs(b2b_pct) > abs(retail_pct) and abs(b2b_pct) > abs(inst_pct):
+        absorption = "partially priced in" if abs(inst_pct) < abs(b2b_pct) else "not yet fully absorbed"
+        parts.append(
+            f"B2B buyers exhibited the strongest reaction ({b2b_pct}%), suggesting supply-chain-driven repricing "
+            f"rather than consumer sentiment shift. Institutional traders registered at {inst_pct}%, "
+            f"indicating the market has {absorption} the disruption. "
+            f"Retail sentiment trailed at {retail_pct}%, consistent with information-lag dynamics."
+        )
+    elif abs(inst_pct) > abs(retail_pct):
+        parts.append(
+            f"Institutional traders moved first ({inst_pct}%), a pattern consistent with "
+            f"information-asymmetry-driven repricing. B2B procurement followed at {b2b_pct}%, "
+            f"with retail consumers lagging at {retail_pct}% — the classic smart-money-leads-dumb-money cascade."
+        )
+    else:
+        parts.append(
+            f"Retail sentiment led the response ({retail_pct}%), indicating a consumer-facing demand shock "
+            f"propagating upstream. B2B adjusted at {b2b_pct}% while institutional positioning "
+            f"registered {inst_pct}%, suggesting limited pass-through to financial markets so far."
+        )
+
+    # Cascade dynamics
+    if abs(demand_change) > 15:
+        parts.append(
+            "The cascade exhibited non-linear amplification — initial agent responses triggered secondary "
+            "behavioral shifts that exceeded the proportional impact of the event itself. This pattern "
+            "historically correlates with sustained, rather than transient, demand displacement."
+        )
+    elif abs(demand_change) > 8:
+        parts.append(
+            "Cascade propagation was measured but persistent, with each simulation wave reinforcing "
+            "rather than dampening the directional signal. Expect the full demand impact to materialize "
+            "within the 30-60 day window."
+        )
+    else:
+        parts.append(
+            "The cascade showed linear propagation patterns, suggesting the demand impact will be "
+            "absorbed within the standard adjustment window without structural market rebalancing."
+        )
+
+    return " ".join(parts)
 
 
 def generate_attestation(sim_id: str, event: str, demand_change: float) -> dict:
@@ -289,9 +416,9 @@ async def run_simulation(sim_id: str, event: str, market_focus: list[str], perso
     sim["total"] = len(agents)
     sim["agents"] = agents
 
-    # Check for OpenAI
-    use_llm = HAS_OPENAI and os.getenv("OPENAI_API_KEY")
-    client = AsyncOpenAI() if use_llm else None
+    # Check for Anthropic API key
+    use_llm = HAS_ANTHROPIC and os.getenv("ANTHROPIC_API_KEY")
+    client = anthropic.AsyncAnthropic() if use_llm else None
 
     # Process in batches of 8
     batch_size = 8
@@ -328,7 +455,7 @@ async def run_simulation(sim_id: str, event: str, market_focus: list[str], perso
     final = aggregate_results(agents, persona_mix)
     demand_curve = generate_demand_curve(final["demandChange"])
     geo_data = generate_geo_data(market_focus, final["demandChange"])
-    narrative = generate_narrative(event, final["demandChange"], final["topSignals"])
+    narrative = generate_narrative(event, final["demandChange"], final["topSignals"], final["behavioral"])
     attestation = generate_attestation(sim_id, event, final["demandChange"])
 
     sim["status"] = "complete"

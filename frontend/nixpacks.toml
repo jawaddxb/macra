@@ -8,4 +8,4 @@ cmds = ["npm install --legacy-peer-deps"]
 cmds = ["npm run build"]
 
 [start]
-cmd = "npx next start -p ${PORT:-3000}"
+cmd = "node node_modules/.bin/next start -p $PORT"

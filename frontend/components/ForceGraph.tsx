@@ -157,24 +157,40 @@ export default function ForceGraph({ agents, width = 800, height = 600 }: ForceG
         setTooltip(null);
       });
 
-    // Force simulation
+    // Force simulation — run synchronous ticks first so nodes are positioned immediately
     const simulation = d3
       .forceSimulation(nodes)
       .force(
         "link",
-        d3.forceLink<GraphNode, GraphLink>(links).id((d) => d.id).distance(20).strength(0.1)
+        d3.forceLink<GraphNode, GraphLink>(links).id((d) => d.id).distance(25).strength(0.1)
       )
-      .force("charge", d3.forceManyBody().strength(-3))
-      .force("collision", d3.forceCollide(6))
+      .force("charge", d3.forceManyBody().strength(-15))
+      .force("collision", d3.forceCollide(7))
       .force(
         "x",
-        d3.forceX<GraphNode>((d) => (CLUSTER_CENTERS[d.type]?.x || 0.5) * width).strength(0.15)
+        d3.forceX<GraphNode>((d) => (CLUSTER_CENTERS[d.type]?.x || 0.5) * width).strength(0.3)
       )
       .force(
         "y",
-        d3.forceY<GraphNode>((d) => (CLUSTER_CENTERS[d.type]?.y || 0.5) * height).strength(0.15)
+        d3.forceY<GraphNode>((d) => (CLUSTER_CENTERS[d.type]?.y || 0.5) * height).strength(0.3)
       )
-      .alphaDecay(0.02)
+      .stop();
+
+    // Run enough ticks synchronously to position all nodes before first render
+    for (let i = 0; i < 120; i++) simulation.tick();
+
+    // Paint initial positions immediately
+    linkGroup
+      .attr("x1", (d: any) => d.source.x)
+      .attr("y1", (d: any) => d.source.y)
+      .attr("x2", (d: any) => d.target.x)
+      .attr("y2", (d: any) => d.target.y);
+    nodeGroup.attr("cx", (d) => d.x!).attr("cy", (d) => d.y!);
+
+    // Then resume for smooth animation
+    simulation
+      .alphaDecay(0.03)
+      .restart()
       .on("tick", () => {
         linkGroup
           .attr("x1", (d: any) => d.source.x)

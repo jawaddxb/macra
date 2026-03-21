@@ -26,10 +26,10 @@ const TIERS = [
   {
     id: "free",
     name: "FREE",
-    agents: "50",
+    agents: "100",
     features: ["Public Results", "3/day limit"],
     price: null,
-    swarmSize: 50,
+    swarmSize: 100,
   },
   {
     id: "pro",

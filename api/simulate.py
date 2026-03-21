@@ -347,9 +347,8 @@ async def run_simulation(sim_id: str, event: str, market_focus: list[str], perso
     sim = simulations[sim_id]
     sim["status"] = "running"
 
-    agents = create_agents(persona_mix, swarm_size, market_focus)
-    sim["total"] = len(agents)
-    sim["agents"] = agents
+    # Agents already pre-created in main.py for immediate ForceGraph rendering
+    agents = sim["agents"]
 
     use_llm = HAS_OPENAI and bool(os.getenv("OPENROUTER_API_KEY"))
 

@@ -4,7 +4,7 @@ from fastapi import FastAPI, BackgroundTasks, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from simulate import simulations, run_simulation
+from simulate import simulations, run_simulation, create_agents
 
 app = FastAPI(title="MACRA API", version="1.0.0")
 
@@ -27,13 +27,15 @@ class SimulationRequest(BaseModel):
 @app.post("/api/simulate")
 async def create_simulation(req: SimulationRequest, background_tasks: BackgroundTasks):
     sim_id = str(uuid.uuid4())[:8]
+    # Pre-create all agents immediately so the ForceGraph renders on first poll
+    agents = create_agents(req.personaMix, req.swarmSize, req.marketFocus)
     simulations[sim_id] = {
         "id": sim_id,
         "event": req.event,
         "status": "initializing",
         "progress": 0,
-        "total": req.swarmSize,
-        "agents": [],
+        "total": len(agents),
+        "agents": agents,
         "sentiment": {"bullish": 0, "bearish": 0, "neutral": 100},
         "topSignals": [],
         "results": None,

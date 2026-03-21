@@ -353,7 +353,7 @@ async def run_simulation(sim_id: str, event: str, market_focus: list[str], perso
 
     use_llm = HAS_OPENAI and bool(os.getenv("OPENROUTER_API_KEY"))
 
-    batch_size = 5 if use_llm else 10
+    batch_size = 10  # 10 concurrent LLM calls — fast enough for good UX
 
     for i in range(0, len(agents), batch_size):
         batch = agents[i:i + batch_size]
@@ -365,7 +365,7 @@ async def run_simulation(sim_id: str, event: str, market_focus: list[str], perso
                 tasks.append(run_agent_llm(agent, event))
             else:
                 async def mock_with_delay(a=agent):
-                    await asyncio.sleep(random.uniform(0.04, 0.12))
+                    await asyncio.sleep(random.uniform(0.02, 0.06))
                     return run_agent_mock(a)
                 tasks.append(mock_with_delay())
 

@@ -22,11 +22,11 @@ interface GraphLink extends d3.SimulationLinkDatum<GraphNode> {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  idle: "#2a2a2a",
-  thinking: "#eab308",
-  bullish: "#22c55e",
-  bearish: "#ef4444",
-  neutral: "#555555",
+  idle: "#1e3a3a",      // dark teal — visible but clearly inactive
+  thinking: "#eab308",  // yellow
+  bullish: "#22c55e",   // green
+  bearish: "#ef4444",   // red
+  neutral: "#6b7280",   // mid-grey
 };
 
 const CLUSTER_X: Record<string, number> = {
@@ -119,7 +119,7 @@ export default function ForceGraph({ agents }: ForceGraphProps) {
 
     const nodeSel = svg.append("g")
       .selectAll("circle").data(nodes).enter().append("circle")
-      .attr("r", (d) => d.status === "thinking" ? 5.5 : 4)
+      .attr("r", (d) => d.status === "thinking" ? 7 : 5)
       .attr("fill", (d) => STATUS_COLORS[d.status] || "#2a2a2a")
       .attr("stroke", (d) => d.status === "thinking" ? "#eab308" : "transparent")
       .attr("stroke-width", 1.5)
@@ -134,7 +134,7 @@ export default function ForceGraph({ agents }: ForceGraphProps) {
     const sim = d3.forceSimulation(nodes)
       .force("link", d3.forceLink<GraphNode, GraphLink>(links).id((d) => d.id).distance(22).strength(0.08))
       .force("charge", d3.forceManyBody().strength(-20))
-      .force("collision", d3.forceCollide(7))
+      .force("collision", d3.forceCollide(8))
       .force("x", d3.forceX<GraphNode>((d) => CLUSTER_X[d.type] * w).strength(0.35))
       .force("y", d3.forceY<GraphNode>(() => CLUSTER_Y * h).strength(0.2))
       .stop();
@@ -165,7 +165,7 @@ export default function ForceGraph({ agents }: ForceGraphProps) {
       .selectAll<SVGCircleElement, GraphNode>("circle")
       .data(agents as any[], (d: any) => d.id)
       .attr("fill", (d: any) => STATUS_COLORS[d.status] || "#2a2a2a")
-      .attr("r", (d: any) => d.status === "thinking" ? 5.5 : 4)
+      .attr("r", (d: any) => d.status === "thinking" ? 7 : 5)
       .attr("stroke", (d: any) => d.status === "thinking" ? "#eab308" : "transparent")
       .style("filter", (d: any) => d.status !== "idle" ? "url(#glow)" : "none");
   }, [agents]);

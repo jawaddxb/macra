@@ -137,8 +137,6 @@ export default function SimulatePage() {
             {status?.agentResults && status.agentResults.length > 0 ? (
               <ForceGraph
                 agents={status.agentResults}
-                width={900}
-                height={650}
               />
             ) : (
               <div className="flex items-center justify-center h-full">

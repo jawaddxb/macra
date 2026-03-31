@@ -113,7 +113,7 @@ export default function SimulatePage() {
             <span className="text-xs text-muted">/ SIMULATION</span>
             <span className="text-xs font-mono text-muted">{id}</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             {status?.status === "complete" ? (
               <span className="flex items-center gap-2 text-green-400 text-xs font-semibold">
                 <div className="w-2 h-2 rounded-full bg-green-400" />
@@ -122,9 +122,16 @@ export default function SimulatePage() {
             ) : (
               <span className="flex items-center gap-2 text-yellow-400 text-xs font-semibold">
                 <div className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse-glow" />
-                SIMULATION RUNNING
+                RUNNING
               </span>
             )}
+            <div className="w-px h-4 bg-border hidden sm:block" />
+            <button
+              onClick={() => router.push("/pre-mortem")}
+              className="text-xs text-muted hover:text-white transition-colors cursor-pointer hidden sm:block"
+            >
+              Pre-Mortem
+            </button>
           </div>
         </div>
       </nav>

@@ -145,12 +145,20 @@ export default function HomePage() {
               Simulate what&apos;s next.
             </span>
           </div>
-          <button
-            onClick={handleViewDemo}
-            className="text-sm text-accent hover:text-accent-light transition-colors flex items-center gap-1 cursor-pointer"
-          >
-            View Demo <ChevronRight size={14} />
-          </button>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => router.push("/pre-mortem")}
+              className="text-sm text-muted hover:text-white transition-colors cursor-pointer hidden sm:block"
+            >
+              Pre-Mortem
+            </button>
+            <button
+              onClick={handleViewDemo}
+              className="text-sm text-accent hover:text-accent-light transition-colors flex items-center gap-1 cursor-pointer"
+            >
+              View Demo <ChevronRight size={14} />
+            </button>
+          </div>
         </div>
       </nav>
 
@@ -176,6 +184,26 @@ export default function HomePage() {
             MACRA deploys thousands of AI-driven behavioral agents to simulate
             how global markets react to real-world events — before they happen.
           </motion.p>
+
+          <motion.div
+            className="mt-6 flex flex-col items-center gap-3"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.25 }}
+          >
+            <div className="inline-flex items-center gap-2">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-accent" />
+              </span>
+              <span className="text-xs font-semibold text-accent tracking-widest uppercase">
+                BETA — Live Now
+              </span>
+            </div>
+            <p className="text-sm text-muted">
+              Bloomberg charges $32K/year. We think signals should be free.
+            </p>
+          </motion.div>
         </div>
       </section>
 
@@ -432,6 +460,16 @@ export default function HomePage() {
                 &quot;The primary signal was not price sensitivity but supply
                 security fear among B2B buyers in the EU.&quot;
               </p>
+            </div>
+
+            <div className="mt-6 text-center">
+              <button
+                onClick={() => router.push("/pre-mortem")}
+                className="inline-flex items-center gap-2 bg-accent/10 hover:bg-accent/20 text-accent border border-accent/20 py-3 px-6 rounded-xl text-sm font-semibold transition-colors cursor-pointer"
+              >
+                Run the Pre-Mortem yourself
+                <ArrowRight size={16} />
+              </button>
             </div>
           </motion.div>
         </div>

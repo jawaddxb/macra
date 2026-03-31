@@ -27,6 +27,8 @@ import {
   Sparkles,
   Copy,
   Check,
+  Share2,
+  Twitter,
 } from "lucide-react";
 import WorldMap from "@/components/WorldMap";
 import { getSimulationResults, type SimulationResults } from "@/lib/api";
@@ -76,6 +78,7 @@ export default function ResultsPage() {
   const [results, setResults] = useState<SimulationResults | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [hashCopied, setHashCopied] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
 
   useEffect(() => {
     async function fetchResults() {
@@ -254,15 +257,22 @@ export default function ResultsPage() {
             <span className="text-xs font-mono text-muted">{id}</span>
           </div>
           <div className="flex items-center gap-3">
-            <span className="flex items-center gap-2 text-green-400 text-xs font-semibold">
+            <span className="flex items-center gap-2 text-green-400 text-xs font-semibold hidden sm:flex">
               <CheckCircle2 size={14} />
-              SIMULATION COMPLETE
+              COMPLETE
             </span>
-            <div className="w-px h-4 bg-border" />
-            <span className="flex items-center gap-1 text-xs text-accent">
+            <div className="w-px h-4 bg-border hidden sm:block" />
+            <span className="flex items-center gap-1 text-xs text-accent hidden sm:flex">
               <Shield size={12} />
-              Knowracle Attested
+              Attested
             </span>
+            <div className="w-px h-4 bg-border hidden sm:block" />
+            <button
+              onClick={() => router.push("/pre-mortem")}
+              className="text-xs text-muted hover:text-white transition-colors cursor-pointer hidden sm:block"
+            >
+              Pre-Mortem
+            </button>
           </div>
         </div>
       </nav>
@@ -455,6 +465,43 @@ export default function ResultsPage() {
           <button className="flex items-center gap-2 bg-accent hover:bg-accent-light text-white py-3 px-6 rounded-xl font-medium transition-colors cursor-pointer">
             <Download size={16} />
             Download PDF Report
+          </button>
+          <button
+            onClick={() => {
+              const url = window.location.href;
+              navigator.clipboard.writeText(url);
+              setShareCopied(true);
+              setTimeout(() => setShareCopied(false), 2000);
+            }}
+            className="flex items-center gap-2 bg-surface hover:bg-surface-alt text-white py-3 px-6 rounded-xl font-medium border border-border transition-colors cursor-pointer"
+          >
+            {shareCopied ? (
+              <>
+                <Check size={16} className="text-green-400" />
+                <span className="text-green-400">Link Copied!</span>
+              </>
+            ) : (
+              <>
+                <Share2 size={16} />
+                Share Results
+              </>
+            )}
+          </button>
+          <button
+            onClick={() => {
+              const text = encodeURIComponent(
+                `I just ran a behavioral demand simulation on MACRA — predicted ${isPositive ? "+" : ""}${results.demandChange.toFixed(1)}% demand shift. Free at macra-frontend-production.up.railway.app`
+              );
+              window.open(
+                `https://twitter.com/intent/tweet?text=${text}`,
+                "_blank",
+                "noopener,noreferrer"
+              );
+            }}
+            className="flex items-center gap-2 bg-surface hover:bg-surface-alt text-white py-3 px-6 rounded-xl font-medium border border-border transition-colors cursor-pointer"
+          >
+            <Twitter size={16} />
+            Share on X
           </button>
           <button className="flex items-center gap-2 bg-surface hover:bg-surface-alt text-white py-3 px-6 rounded-xl font-medium border border-border transition-colors cursor-pointer">
             <Code2 size={16} />

@@ -2,424 +2,256 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { motion } from "framer-motion";
-import { Doughnut } from "react-chartjs-2";
-import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
-import { Activity, Zap, Signal, Clock, MessageSquare, Radio } from "lucide-react";
-import ForceGraph from "@/components/ForceGraph";
-import { getSimulationStatus, type SimulationStatus } from "@/lib/api";
+import { AnimatePresence } from "framer-motion";
+import dynamic from "next/dynamic";
+import {
+  getSimulationStatus,
+  type SimulationStatus,
+  type RecentResponse,
+} from "@/lib/api";
+import AgentFeed from "@/components/AgentFeed";
+import SentimentCascade from "@/components/SentimentCascade";
+import BottomTicker from "@/components/BottomTicker";
+import CompletionOverlay from "@/components/CompletionOverlay";
 
-ChartJS.register(ArcElement, Tooltip, Legend);
+// Dynamic import — GlobeView uses WebGL/Three.js (no SSR)
+const GlobeView = dynamic(() => import("@/components/GlobeView"), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-full flex items-center justify-center">
+      <div className="font-mono text-xs text-[#00ff88]/30 tracking-[0.3em] animate-pulse">
+        INITIALIZING GLOBE
+      </div>
+    </div>
+  ),
+});
+
+function formatElapsed(s: number): string {
+  return `${Math.floor(s / 60)
+    .toString()
+    .padStart(2, "0")}:${(s % 60).toString().padStart(2, "0")}`;
+}
 
 export default function SimulatePage() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
+
   const [status, setStatus] = useState<SimulationStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [startTime] = useState(Date.now());
-  const [eta, setEta] = useState<number>(45);
+  const [elapsed, setElapsed] = useState(0);
+  const [allResponses, setAllResponses] = useState<RecentResponse[]>([]);
+  const [eventText, setEventText] = useState(
+    "GLOBAL BEHAVIORAL DEMAND SIMULATION",
+  );
 
+  // Read event text from sessionStorage (set by home page)
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem("macra_event");
+      if (saved) setEventText(saved.toUpperCase());
+    } catch {}
+  }, []);
+
+  // Elapsed time counter
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - startTime) / 1000));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [startTime]);
+
+  // Accumulate unique responses across poll cycles
+  useEffect(() => {
+    if (!status?.recentResponses?.length) return;
+    setAllResponses((prev) => {
+      const existing = new Set(prev.map((r) => r.response));
+      const newItems = status.recentResponses.filter(
+        (r) => !existing.has(r.response),
+      );
+      if (newItems.length === 0) return prev;
+      return [...newItems, ...prev].slice(0, 100);
+    });
+  }, [status?.recentResponses]);
+
+  // Poll simulation status every 2s
   const fetchStatus = useCallback(async () => {
     try {
       const data = await getSimulationStatus(id);
       setStatus(data);
-
-      if (data.progress > 0 && data.total > 0) {
-        const elapsed = (Date.now() - startTime) / 1000;
-        const rate = data.progress / elapsed;
-        const remaining = (data.total - data.progress) / rate;
-        setEta(Math.max(1, Math.round(remaining)));
-      }
-
-      if (data.status === "complete") {
-        setTimeout(() => router.push(`/results/${id}`), 1500);
-      }
-    } catch (err) {
-      setError("Failed to fetch simulation status");
+      setError(null);
+    } catch {
+      setError("Connection lost \u2014 retrying...");
     }
-  }, [id, router, startTime]);
+  }, [id]);
 
   useEffect(() => {
     fetchStatus();
-    const interval = setInterval(fetchStatus, 1000);
+    const interval = setInterval(fetchStatus, 2000);
     return () => clearInterval(interval);
   }, [fetchStatus]);
 
-  if (error) {
+  const progress = status
+    ? Math.round((status.progress / Math.max(1, status.total)) * 100)
+    : 0;
+
+  // ─── Error state ─────────────────────────────────────────
+  if (error && !status) {
     return (
-      <div className="min-h-screen bg-bg flex items-center justify-center">
-        <div className="glass rounded-2xl p-8 text-center max-w-md">
-          <div className="text-red-400 mb-4">{error}</div>
+      <div className="h-screen bg-[#050a0f] flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-[#ff4444] font-mono text-sm mb-4">
+            {error}
+          </div>
           <button
             onClick={() => router.push("/")}
-            className="text-accent hover:text-accent-light cursor-pointer"
+            className="text-[#00ff88] hover:underline font-mono text-sm cursor-pointer"
           >
-            Return Home
+            RETURN HOME
           </button>
         </div>
       </div>
     );
   }
 
-  const progress = status
-    ? Math.round((status.progress / Math.max(1, status.total)) * 100)
-    : 0;
-
-  const donutData = {
-    labels: ["Bullish", "Bearish", "Neutral"],
-    datasets: [
-      {
-        data: [
-          status?.sentiment.bullish || 0,
-          status?.sentiment.bearish || 0,
-          status?.sentiment.neutral || 100,
-        ],
-        backgroundColor: ["#22c55e", "#ef4444", "#333333"],
-        borderColor: ["#22c55e", "#ef4444", "#333333"],
-        borderWidth: 0,
-        cutout: "75%",
-      },
-    ],
-  };
-
-  const donutOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: { display: false },
-      tooltip: {
-        backgroundColor: "#161616",
-        titleColor: "#fff",
-        bodyColor: "#e5e5e5",
-        borderColor: "#1f1f1f",
-        borderWidth: 1,
-      },
-    },
-  };
-
+  // ─── Main render ─────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-bg">
-      {/* Header */}
-      <nav className="glass border-b border-border">
-        <div className="max-w-full px-6 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span
-              className="text-xl font-bold text-accent cursor-pointer"
-              onClick={() => router.push("/")}
-            >
-              MACRA
+    <div className="h-screen flex flex-col overflow-hidden war-room-grid relative">
+      {/* Scan line effect */}
+      <div className="war-room-scan" />
+
+      {/* ═══════════════ HERO HEADER BAR ═══════════════ */}
+      <header className="h-14 flex-shrink-0 border-b border-[#0d1b2a] flex items-center px-4 lg:px-6 bg-[#050a0f]/90 backdrop-blur-sm relative z-20">
+        {/* Left: MACRA + LIVE badge */}
+        <div className="flex items-center gap-3 flex-shrink-0">
+          <span
+            className="text-lg font-bold text-white tracking-[0.2em] glow-white cursor-pointer"
+            onClick={() => router.push("/")}
+          >
+            MACRA
+          </span>
+          <div className="flex items-center gap-1.5 bg-[#ff0000]/10 border border-[#ff0000]/30 px-2 py-0.5">
+            <div className="w-1.5 h-1.5 rounded-full bg-[#ff0000] animate-pulse-red" />
+            <span className="text-[9px] font-bold text-[#ff0000] tracking-[0.2em]">
+              LIVE
             </span>
-            <span className="text-xs text-muted">/ SIMULATION</span>
-            <span className="text-xs font-mono text-muted">{id}</span>
           </div>
+        </div>
+
+        {/* Center: Event text + progress */}
+        <div className="flex-1 flex flex-col items-center gap-0.5 mx-4 overflow-hidden">
+          <span className="text-[11px] text-white/80 font-medium tracking-wider truncate max-w-lg glow-white">
+            {eventText}
+          </span>
           <div className="flex items-center gap-3">
-            {status?.status === "complete" ? (
-              <span className="flex items-center gap-2 text-green-400 text-xs font-semibold">
-                <div className="w-2 h-2 rounded-full bg-green-400" />
-                COMPLETE
-              </span>
-            ) : (
-              <span className="flex items-center gap-2 text-yellow-400 text-xs font-semibold">
-                <div className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse-glow" />
-                RUNNING
-              </span>
-            )}
-            <div className="w-px h-4 bg-border hidden sm:block" />
-            <button
-              onClick={() => router.push("/pre-mortem")}
-              className="text-xs text-muted hover:text-white transition-colors cursor-pointer hidden sm:block"
-            >
-              Pre-Mortem
-            </button>
-          </div>
-        </div>
-      </nav>
-
-      {/* Main Content */}
-      <div className="flex flex-col lg:flex-row h-[calc(100vh-56px)]">
-        {/* Left: Force Graph */}
-        <div className="flex-1 lg:w-[65%] p-4 relative">
-          <div className="glass rounded-2xl h-full overflow-hidden">
-            {status?.agentResults && status.agentResults.length > 0 ? (
-              <ForceGraph
-                agents={status.agentResults}
+            <span className="text-[10px] font-mono text-white/40">
+              {status?.progress || 0} / {status?.total || 0}
+            </span>
+            <div className="w-32 h-1 bg-[#0d1b2a] overflow-hidden">
+              <div
+                className="h-full bg-[#00ff88] transition-all duration-500"
+                style={{ width: `${progress}%` }}
               />
-            ) : (
-              <div className="flex items-center justify-center h-full">
-                <div className="text-center">
-                  <div className="w-8 h-8 border-2 border-accent/30 border-t-accent rounded-full animate-spin mx-auto mb-4" />
-                  <div className="text-muted text-sm">
-                    Initializing agent swarm...
-                  </div>
-                </div>
-              </div>
-            )}
+            </div>
+            <span className="text-[10px] font-mono text-[#00ff88]">
+              {progress}%
+            </span>
           </div>
         </div>
 
-        {/* Right: Stats Panel */}
-        <div className="lg:w-[35%] p-4 lg:pl-0 overflow-y-auto">
-          <div className="space-y-4">
-            {/* Progress */}
-            <motion.div
-              className="glass rounded-xl p-5"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-            >
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <Activity size={14} className="text-accent" />
-                  <span className="text-xs font-semibold text-muted tracking-widest uppercase">
-                    Progress
-                  </span>
-                </div>
-                <span className="text-xs text-muted font-mono">
-                  {status?.progress || 0} / {status?.total || 0}
-                </span>
-              </div>
-              <div className="h-2 bg-bg rounded-full overflow-hidden">
-                <motion.div
-                  className="h-full bg-accent rounded-full"
-                  initial={{ width: 0 }}
-                  animate={{ width: `${progress}%` }}
-                  transition={{ duration: 0.3 }}
-                />
-              </div>
-              <div className="flex items-center justify-between mt-2">
-                <span className="text-lg font-bold text-white">
-                  {progress}%
-                </span>
-                <div className="flex items-center gap-1 text-muted text-xs">
-                  <Clock size={12} />
-                  <span>
-                    ETA: {status?.status === "complete" ? "Done" : `${eta}s`}
-                  </span>
-                </div>
-              </div>
-            </motion.div>
-
-            {/* Sentiment Donut */}
-            <motion.div
-              className="glass rounded-xl p-5"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.1 }}
-            >
-              <div className="flex items-center gap-2 mb-4">
-                <Zap size={14} className="text-accent" />
-                <span className="text-xs font-semibold text-muted tracking-widest uppercase">
-                  Sentiment Distribution
-                </span>
-              </div>
-              <div className="h-48 flex items-center justify-center">
-                <Doughnut data={donutData} options={donutOptions} />
-              </div>
-              <div className="flex justify-center gap-6 mt-4">
-                {[
-                  {
-                    label: "Bullish",
-                    value: status?.sentiment.bullish || 0,
-                    color: "#22c55e",
-                  },
-                  {
-                    label: "Bearish",
-                    value: status?.sentiment.bearish || 0,
-                    color: "#ef4444",
-                  },
-                  {
-                    label: "Neutral",
-                    value: status?.sentiment.neutral || 0,
-                    color: "#666",
-                  },
-                ].map((item) => (
-                  <div key={item.label} className="text-center">
-                    <div
-                      className="text-lg font-bold"
-                      style={{ color: item.color }}
-                    >
-                      {item.value}%
-                    </div>
-                    <div className="text-xs text-muted">{item.label}</div>
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-
-            {/* Top Signals */}
-            <motion.div
-              className="glass rounded-xl p-5"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.2 }}
-            >
-              <div className="flex items-center gap-2 mb-4">
-                <Signal size={14} className="text-accent" />
-                <span className="text-xs font-semibold text-muted tracking-widest uppercase">
-                  Top Signals Detected
-                </span>
-              </div>
-              <div className="space-y-2">
-                {(status?.topSignals || []).slice(0, 5).map((signal, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center justify-between py-2 border-b border-border last:border-0"
-                  >
-                    <span className="text-sm text-text-secondary capitalize">
-                      {signal.signal}
-                    </span>
-                    <span className="text-xs font-mono text-accent">
-                      {signal.strength}%
-                    </span>
-                  </div>
-                ))}
-                {(!status?.topSignals || status.topSignals.length === 0) && (
-                  <div className="text-xs text-muted text-center py-4">
-                    Analyzing behavioral patterns...
-                  </div>
-                )}
-              </div>
-            </motion.div>
-
-            {/* Live Ticker */}
-            <motion.div
-              className="glass rounded-xl p-5"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.25 }}
-            >
-              <div className="flex items-center gap-2 mb-4">
-                <Radio size={14} className="text-accent" />
-                <span className="text-xs font-semibold text-muted tracking-widest uppercase">
-                  Live Ticker
-                </span>
-                <span className="relative flex h-1.5 w-1.5 ml-auto">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75" />
-                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-accent" />
-                </span>
-              </div>
-              <div className="space-y-1.5 max-h-[220px] overflow-hidden">
-                {(() => {
-                  const recent = (status?.recentResponses || []).slice(-6).reverse();
-                  if (recent.length === 0) {
-                    return (
-                      <div className="text-xs text-muted text-center py-4">
-                        Waiting for responses...
-                      </div>
-                    );
-                  }
-                  return recent.map((item, i) => (
-                    <motion.div
-                      key={`ticker-${i}-${item.response?.slice(0, 20)}`}
-                      className="flex items-start gap-2 py-1.5 border-b border-border/50 last:border-0"
-                      initial={{ opacity: 0, y: -8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.3, delay: i * 0.05 }}
-                    >
-                      <span
-                        className={`text-[9px] font-bold tracking-wider uppercase px-1.5 py-0.5 rounded flex-shrink-0 mt-0.5 ${
-                          item.type === "retail"
-                            ? "bg-blue-500/15 text-blue-400"
-                            : item.type === "b2b"
-                              ? "bg-purple-500/15 text-purple-400"
-                              : "bg-amber-500/15 text-amber-400"
-                        }`}
-                      >
-                        {item.type === "retail" ? "RTL" : item.type === "b2b" ? "B2B" : "INS"}
-                      </span>
-                      <span className="text-[11px] text-text-secondary leading-snug">
-                        {item.response && item.response.length > 80
-                          ? item.response.slice(0, 80) + "…"
-                          : item.response || "—"}
-                      </span>
-                    </motion.div>
-                  ));
-                })()}
-              </div>
-            </motion.div>
-
-            {/* Agent Reasoning Feed */}
-            <motion.div
-              className="glass rounded-xl p-5"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.3 }}
-            >
-              <div className="flex items-center gap-2 mb-4">
-                <MessageSquare size={14} className="text-accent" />
-                <span className="text-xs font-semibold text-muted tracking-widest uppercase">
-                  Agent Reasoning Feed
-                </span>
-              </div>
-              <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
-                {(() => {
-                  const completedAgents = (status?.agentResults || [])
-                    .filter((a) => a.response && a.status !== "idle" && a.status !== "thinking")
-                    .slice(-8)
-                    .reverse();
-                  if (completedAgents.length === 0) {
-                    return (
-                      <div className="text-xs text-muted text-center py-4">
-                        Waiting for agent responses...
-                      </div>
-                    );
-                  }
-                  return completedAgents.map((agent) => (
-                    <div
-                      key={agent.id}
-                      className="bg-bg rounded-lg p-3 border border-border"
-                    >
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span
-                          className={`text-[10px] font-bold tracking-wider uppercase px-1.5 py-0.5 rounded ${
-                            agent.type === "retail"
-                              ? "bg-blue-500/15 text-blue-400"
-                              : agent.type === "b2b"
-                                ? "bg-purple-500/15 text-purple-400"
-                                : "bg-amber-500/15 text-amber-400"
-                          }`}
-                        >
-                          {agent.type}
-                        </span>
-                        <span className="text-[10px] text-muted">
-                          {agent.region}
-                        </span>
-                      </div>
-                      <p className="text-xs text-text-secondary leading-relaxed">
-                        &quot;{agent.response}&quot;
-                      </p>
-                      <div className="mt-1.5 flex items-center gap-1">
-                        <div
-                          className={`w-1.5 h-1.5 rounded-full ${
-                            agent.status === "bullish"
-                              ? "bg-green-400"
-                              : agent.status === "bearish"
-                                ? "bg-red-400"
-                                : "bg-gray-500"
-                          }`}
-                        />
-                        <span
-                          className={`text-[10px] font-medium ${
-                            agent.status === "bullish"
-                              ? "text-green-400"
-                              : agent.status === "bearish"
-                                ? "text-red-400"
-                                : "text-gray-500"
-                          }`}
-                        >
-                          {agent.sentiment !== null
-                            ? `${agent.sentiment > 0 ? "+" : ""}${(agent.sentiment * 100).toFixed(0)}%`
-                            : "—"}
-                        </span>
-                      </div>
-                    </div>
-                  ));
-                })()}
-              </div>
-            </motion.div>
+        {/* Right: Sentiment bar + elapsed time */}
+        <div className="flex items-center gap-4 flex-shrink-0">
+          <div className="hidden sm:flex items-center gap-2">
+            <span className="text-[9px] font-mono text-[#ff4444] tracking-wider">
+              BEAR
+            </span>
+            <div className="w-20 h-1.5 bg-[#0d1b2a] flex overflow-hidden">
+              <div
+                className="bg-[#ff4444] transition-all duration-500"
+                style={{
+                  width: `${status?.sentiment?.bearish || 0}%`,
+                }}
+              />
+              <div
+                className="bg-[#333] transition-all duration-500"
+                style={{
+                  width: `${status?.sentiment?.neutral || 100}%`,
+                }}
+              />
+              <div
+                className="bg-[#00ff88] transition-all duration-500"
+                style={{
+                  width: `${status?.sentiment?.bullish || 0}%`,
+                }}
+              />
+            </div>
+            <span className="text-[9px] font-mono text-[#00ff88] tracking-wider">
+              BULL
+            </span>
           </div>
+          <div className="w-px h-4 bg-[#0d1b2a] hidden sm:block" />
+          <span className="font-mono text-xs text-white/30">
+            {formatElapsed(elapsed)}
+          </span>
+        </div>
+      </header>
+
+      {/* ═══════════════ MAIN CONTENT ═══════════════ */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Agent Feed — Left Panel */}
+        <div className="w-72 border-r border-[#0d1b2a] overflow-hidden hidden lg:flex flex-col flex-shrink-0">
+          <AgentFeed responses={allResponses} />
+        </div>
+
+        {/* Globe — Center (dominant) */}
+        <div className="flex-1 relative">
+          <GlobeView
+            agentResults={status?.agentResults || []}
+            recentResponses={status?.recentResponses || []}
+          />
+          {/* Vignette overlay for depth */}
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              background:
+                "radial-gradient(ellipse at center, transparent 40%, rgba(5, 10, 15, 0.6) 100%)",
+            }}
+          />
+        </div>
+
+        {/* Sentiment Cascade — Right Panel */}
+        <div className="w-80 border-l border-[#0d1b2a] overflow-y-auto hidden lg:block flex-shrink-0">
+          <SentimentCascade
+            sentiment={
+              status?.sentiment || {
+                bullish: 0,
+                bearish: 0,
+                neutral: 100,
+              }
+            }
+            agentResults={status?.agentResults || []}
+            topSignals={status?.topSignals || []}
+          />
         </div>
       </div>
+
+      {/* ═══════════════ BOTTOM TICKER ═══════════════ */}
+      <div className="h-9 flex-shrink-0 border-t border-[#0d1b2a] overflow-hidden bg-[#050a0f]/90">
+        <BottomTicker responses={allResponses} />
+      </div>
+
+      {/* ═══════════════ COMPLETION OVERLAY ═══════════════ */}
+      <AnimatePresence>
+        {status?.status === "complete" && (
+          <CompletionOverlay
+            sentiment={status.sentiment}
+            topSignals={status.topSignals}
+            agentResults={status.agentResults}
+            simulationId={id}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -108,6 +108,7 @@ export default function HomePage() {
         personaMix,
         swarmSize: tier?.swarmSize || 500,
       });
+      try { sessionStorage.setItem("macra_event", event.trim()); } catch {}
       router.push(`/simulate/${simulationId}`);
     } catch (err) {
       console.error("Failed to create simulation:", err);
@@ -125,6 +126,7 @@ export default function HomePage() {
         personaMix: { retail: 35, b2b: 40, institutional: 25 },
         swarmSize: 500,
       });
+      try { sessionStorage.setItem("macra_event", "Red Sea shipping crisis — Houthi attacks force major carriers to reroute around Cape of Good Hope"); } catch {}
       router.push(`/simulate/${simulationId}`);
     } catch (err) {
       console.error("Failed to start demo:", err);

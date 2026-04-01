@@ -3,19 +3,24 @@
 @tailwind utilities;
 
 html, body {
-  background: #0a0a0a;
-  color: #e5e5e5;
+  background: #050a0f;
+  color: #c8d6e5;
 }
 
 @layer utilities {
   .glass {
-    background: rgba(17, 17, 17, 0.8);
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(31, 31, 31, 0.8);
+    background: rgba(10, 16, 24, 0.85);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(26, 36, 48, 0.8);
   }
   .glass-hover:hover {
-    background: rgba(22, 22, 22, 0.9);
+    background: rgba(16, 24, 32, 0.9);
     border-color: rgba(10, 123, 110, 0.3);
+  }
+  .glass-surface {
+    background: rgba(10, 16, 24, 0.6);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(26, 36, 48, 0.6);
   }
 }
 
@@ -24,10 +29,10 @@ html, body {
   width: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #0a0a0a;
+  background: #050a0f;
 }
 ::-webkit-scrollbar-thumb {
-  background: #1f1f1f;
+  background: #1a2430;
   border-radius: 3px;
 }
 

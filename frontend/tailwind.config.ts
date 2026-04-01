@@ -8,15 +8,18 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        bg: "#0a0a0a",
-        surface: "#111111",
-        "surface-alt": "#161616",
+        bg: "#050a0f",
+        surface: "#0a1018",
+        "surface-alt": "#101820",
         accent: "#0A7B6E",
         "accent-light": "#0d9e8d",
-        border: "#1f1f1f",
-        muted: "#666666",
+        border: "#1a2430",
+        muted: "#5a6a7a",
         "text-primary": "#ffffff",
-        "text-secondary": "#e5e5e5",
+        "text-secondary": "#c8d6e5",
+      },
+      fontFamily: {
+        mono: ["var(--font-space-mono)", "ui-monospace", "monospace"],
       },
     },
   },

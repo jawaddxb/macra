@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Doughnut } from "react-chartjs-2";
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
-import { Activity, Zap, Signal, Clock, MessageSquare } from "lucide-react";
+import { Activity, Zap, Signal, Clock, MessageSquare, Radio } from "lucide-react";
 import ForceGraph from "@/components/ForceGraph";
 import { getSimulationStatus, type SimulationStatus } from "@/lib/api";
 
@@ -278,6 +278,63 @@ export default function SimulatePage() {
                     Analyzing behavioral patterns...
                   </div>
                 )}
+              </div>
+            </motion.div>
+
+            {/* Live Ticker */}
+            <motion.div
+              className="glass rounded-xl p-5"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.25 }}
+            >
+              <div className="flex items-center gap-2 mb-4">
+                <Radio size={14} className="text-accent" />
+                <span className="text-xs font-semibold text-muted tracking-widest uppercase">
+                  Live Ticker
+                </span>
+                <span className="relative flex h-1.5 w-1.5 ml-auto">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75" />
+                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-accent" />
+                </span>
+              </div>
+              <div className="space-y-1.5 max-h-[220px] overflow-hidden">
+                {(() => {
+                  const recent = (status?.recentResponses || []).slice(-6).reverse();
+                  if (recent.length === 0) {
+                    return (
+                      <div className="text-xs text-muted text-center py-4">
+                        Waiting for responses...
+                      </div>
+                    );
+                  }
+                  return recent.map((item, i) => (
+                    <motion.div
+                      key={`ticker-${i}-${item.response?.slice(0, 20)}`}
+                      className="flex items-start gap-2 py-1.5 border-b border-border/50 last:border-0"
+                      initial={{ opacity: 0, y: -8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.3, delay: i * 0.05 }}
+                    >
+                      <span
+                        className={`text-[9px] font-bold tracking-wider uppercase px-1.5 py-0.5 rounded flex-shrink-0 mt-0.5 ${
+                          item.type === "retail"
+                            ? "bg-blue-500/15 text-blue-400"
+                            : item.type === "b2b"
+                              ? "bg-purple-500/15 text-purple-400"
+                              : "bg-amber-500/15 text-amber-400"
+                        }`}
+                      >
+                        {item.type === "retail" ? "RTL" : item.type === "b2b" ? "B2B" : "INS"}
+                      </span>
+                      <span className="text-[11px] text-text-secondary leading-snug">
+                        {item.response && item.response.length > 80
+                          ? item.response.slice(0, 80) + "…"
+                          : item.response || "—"}
+                      </span>
+                    </motion.div>
+                  ));
+                })()}
               </div>
             </motion.div>
 

@@ -38,6 +38,7 @@ async def create_simulation(req: SimulationRequest, background_tasks: Background
         "agents": agents,
         "sentiment": {"bullish": 0, "bearish": 0, "neutral": 100},
         "topSignals": [],
+        "recentResponses": [],
         "results": None,
     }
     background_tasks.add_task(run_simulation, sim_id, req.event, req.marketFocus, req.personaMix, req.swarmSize)

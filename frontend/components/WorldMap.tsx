@@ -13,39 +13,48 @@ interface WorldMapProps {
 
 const REGION_PATHS: Record<string, { path: string; labelX: number; labelY: number }> = {
   NA: {
-    path: "M40,60 L180,60 L200,80 L200,160 L160,200 L120,180 L80,200 L40,160 Z",
+    path: "M50,65 L140,55 L185,70 L195,90 L185,135 L165,165 L140,178 L115,168 L90,175 L65,155 L45,130 L42,100 Z",
     labelX: 120,
-    labelY: 130,
+    labelY: 120,
   },
   SA: {
-    path: "M120,210 L180,210 L200,250 L190,320 L160,360 L130,350 L110,300 L100,250 Z",
-    labelX: 150,
-    labelY: 285,
+    path: "M130,195 L170,190 L190,205 L205,230 L210,270 L200,310 L178,345 L158,355 L140,340 L122,295 L112,255 L115,220 Z",
+    labelX: 162,
+    labelY: 275,
   },
   EU: {
-    path: "M310,55 L420,50 L440,70 L430,130 L380,140 L340,130 L300,120 L300,80 Z",
+    path: "M305,48 L380,42 L430,50 L445,62 L440,90 L420,110 L390,118 L355,112 L320,100 L302,82 L298,62 Z",
     labelX: 370,
-    labelY: 95,
+    labelY: 80,
   },
   AF: {
-    path: "M310,150 L410,150 L430,180 L420,280 L380,320 L340,310 L310,260 L300,200 Z",
+    path: "M305,148 L385,142 L420,158 L435,190 L435,240 L420,290 L395,325 L365,335 L335,320 L310,275 L295,225 L295,180 Z",
     labelX: 365,
     labelY: 235,
   },
   MENA: {
-    path: "M440,90 L530,80 L550,120 L540,170 L500,180 L460,170 L440,140 Z",
-    labelX: 490,
-    labelY: 130,
+    path: "M448,88 L520,78 L558,88 L562,108 L555,145 L530,158 L500,162 L472,152 L450,132 L442,108 Z",
+    labelX: 502,
+    labelY: 120,
   },
   APAC: {
-    path: "M540,60 L700,50 L720,80 L730,160 L700,220 L640,250 L580,230 L550,180 L540,120 Z",
-    labelX: 635,
-    labelY: 140,
+    path: "M548,48 L660,38 L710,52 L730,75 L735,115 L720,165 L690,200 L655,215 L608,218 L568,195 L548,155 L540,105 Z",
+    labelX: 640,
+    labelY: 128,
   },
 };
 
 function getImpactColor(impact: number): string {
   const abs = Math.abs(impact);
+  if (impact < 0) {
+    // Bearish — red tones
+    if (abs > 20) return "rgba(220, 38, 38, 0.65)";
+    if (abs > 15) return "rgba(220, 38, 38, 0.5)";
+    if (abs > 10) return "rgba(220, 38, 38, 0.35)";
+    if (abs > 5) return "rgba(220, 38, 38, 0.22)";
+    return "rgba(220, 38, 38, 0.1)";
+  }
+  // Bullish — teal/green tones
   if (abs > 20) return "rgba(10, 123, 110, 0.7)";
   if (abs > 15) return "rgba(10, 123, 110, 0.55)";
   if (abs > 10) return "rgba(10, 123, 110, 0.4)";
@@ -90,7 +99,7 @@ export default function WorldMap({ data }: WorldMapProps) {
               <motion.path
                 d={region.path}
                 fill={getImpactColor(regionData.impact)}
-                stroke="#0A7B6E"
+                stroke={regionData.impact < 0 ? "#dc2626" : "#0A7B6E"}
                 strokeWidth={1}
                 strokeOpacity={0.3}
                 initial={{ opacity: 0 }}
@@ -114,7 +123,7 @@ export default function WorldMap({ data }: WorldMapProps) {
                 x={region.labelX}
                 y={region.labelY + 8}
                 textAnchor="middle"
-                fill="#0A7B6E"
+                fill={regionData.impact < 0 ? "#ef4444" : "#0A7B6E"}
                 fontSize="16"
                 fontWeight="700"
               >

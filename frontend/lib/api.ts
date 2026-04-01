@@ -16,6 +16,13 @@ export interface AgentResult {
   response: string | null;
 }
 
+export interface RecentResponse {
+  type: string;
+  region: string;
+  response: string;
+  sentiment: number;
+}
+
 export interface SimulationStatus {
   status: "initializing" | "running" | "complete";
   progress: number;
@@ -23,6 +30,7 @@ export interface SimulationStatus {
   sentiment: { bullish: number; bearish: number; neutral: number };
   topSignals: { signal: string; count: number; strength: number }[];
   agentResults: AgentResult[];
+  recentResponses: RecentResponse[];
 }
 
 export interface DemandCurvePoint {

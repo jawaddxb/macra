@@ -162,19 +162,44 @@ export default function HomePage() {
         </div>
       </nav>
 
+      {/* Radar Pulse Keyframes */}
+      <style jsx global>{`
+        @keyframes radar-pulse {
+          0% { transform: scale(0.3); opacity: 0.06; }
+          100% { transform: scale(2.5); opacity: 0; }
+        }
+      `}</style>
+
       {/* Hero */}
       <section className="pt-32 pb-12 px-6">
         <div className="max-w-4xl mx-auto text-center">
-          <motion.h1
-            className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white leading-tight tracking-tight"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-          >
-            Feed it a news event.
-            <br />
-            <span className="text-accent">Watch the world respond.</span>
-          </motion.h1>
+          {/* Radar pulse rings behind title */}
+          <div className="relative inline-block">
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none" aria-hidden="true">
+              {[0, 1, 2, 3].map((i) => (
+                <div
+                  key={i}
+                  className="absolute rounded-full"
+                  style={{
+                    width: 320,
+                    height: 320,
+                    background: "radial-gradient(circle, rgba(10,123,110,0.06) 0%, transparent 70%)",
+                    animation: `radar-pulse 4s ease-out ${i * 1}s infinite`,
+                  }}
+                />
+              ))}
+            </div>
+            <motion.h1
+              className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white leading-tight tracking-tight relative z-10"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6 }}
+            >
+              Feed it a news event.
+              <br />
+              <span className="text-accent">Watch the world respond.</span>
+            </motion.h1>
+          </div>
           <motion.p
             className="mt-6 text-lg text-muted max-w-2xl mx-auto"
             initial={{ opacity: 0, y: 20 }}
@@ -506,7 +531,7 @@ export default function HomePage() {
           <div className="flex items-center gap-2">
             <span className="text-lg font-bold text-accent">MACRA</span>
             <span className="text-xs text-muted">
-              &copy; 2024 Vanar Chain
+              &copy; 2025 Vanar Chain
             </span>
           </div>
           <div className="text-xs text-muted">

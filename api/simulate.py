@@ -381,10 +381,18 @@ async def run_simulation(sim_id: str, event: str, market_focus: list[str], perso
             agg = aggregate_results(completed, persona_mix)
             sim["sentiment"] = agg["sentiment"]
             sim["topSignals"] = agg["topSignals"]
-            # Expose latest agent responses for the feed
-            latest = [{"type": a["type"], "region": a["region"], "response": a["result"]["response"], "sentiment": a["result"]["sentiment"]} 
-                      for a in completed[-8:]]
-            sim["recentResponses"] = latest
+            # Expose latest agent responses for the live ticker feed
+            for agent in batch:
+                if agent["result"]:
+                    entry = {
+                        "persona": agent["type"],
+                        "type": agent["type"],
+                        "response": agent["result"]["response"],
+                        "sentiment": agent["result"]["sentiment"],
+                    }
+                    recent = sim.get("recentResponses", [])
+                    recent.append(entry)
+                    sim["recentResponses"] = recent[-20:]
 
     final = aggregate_results(agents, persona_mix)
     demand_curve = generate_demand_curve(final["demandChange"])

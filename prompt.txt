@@ -1,0 +1,37 @@
+Build the complete MACRA demo in Next.js 14 (App Router) + FastAPI (Python).
+
+MACRA: Live Global Behavioral Demand Simulator.
+Architecture:
+1. Frontend: Next.js 14, Tailwind, Framer Motion, D3.js (for network graph), Lucide React (icons).
+2. Backend: FastAPI (Python).
+
+FEATURES TO IMPLEMENT:
+1. THREE MAIN SCREENS:
+   - / (Home/Input): Seed Input UI. Large text area for "Event Catalyst", multi-select for "Market Focus", sliders for "Persona Mix" (Retail, B2B, Institutional), and "Swarm Size" selector (500 agents FREE, 10K/100K PAID tiers).
+   - /simulate: Live Cascade Visualization. A D3.js force-directed graph where nodes are agents (colored by state: idle/processing/bullish/bearish). A sidebar with live stats (sentiment, triggers, time remaining). Use WebSockets or long-polling (mocked) for the real-time effect.
+   - /results/[id]: Output Dashboard. Big bold "Demand Change" hero metric. Animated line chart for demand projections (30/60/90 days). Simple geographic heatmap. "Why" narrative synthesized from agent outputs. Mock "Knowracle On-Chain Attestation" badge with a SHA-256 hash.
+
+2. SIMULATION ENGINE (Python):
+   - A mock engine that simulates 8 LLM agent calls.
+   - Each agent should have a distinct persona (Retail Consumer, EU B2B Buyer, Global Institutional Trader, etc.).
+   - Each agent returns a sentiment score, a behavioral response, and key factors.
+   - Aggregate these into a "Demand Signal".
+
+3. DESIGN & BRANDING:
+   - Dark Mode: Background #0a0a0a.
+   - Accent: Vanar Teal #0A7B6E.
+   - Clean, professional, "institutional" feel.
+
+4. MONOREPO STRUCTURE:
+   - /frontend: Next.js app.
+   - /backend: FastAPI app.
+   - Root README.md: Include the "Pre-Mortem" demo scenario (Red Sea shipping crisis prediction 72h before it hit).
+
+5. MOCK SYSTEMS:
+   - x402 payment gate modal UI for the Paid tier.
+   - Knowracle badge (SHA-256 of params + timestamp).
+
+6. DEMO SCENARIO (README):
+   "The Pre-Mortem" — show a historical simulation using Red Sea shipping crisis news (3 days before it broke) that predicted +22% shipping costs, -14% EU retail demand, +8% nearshoring intent. Then show actual outcomes matched. "Macra had the answer 72 hours before the market did."
+
+Run the build now. Make it high-quality and fully functional for a demo.
